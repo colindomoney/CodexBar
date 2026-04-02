@@ -37,6 +37,7 @@ extension UsageStore {
     func observeSettingsChanges() {
         withObservationTracking {
             _ = self.settings.refreshFrequency
+            _ = self.settings.metricsExportInterval
             _ = self.settings.statusChecksEnabled
             _ = self.settings.sessionQuotaNotificationsEnabled
             _ = self.settings.usageBarsShowUsed
@@ -60,9 +61,11 @@ extension UsageStore {
                 self.probeLogs = [:]
                 guard self.startupBehavior.automaticallyStartsBackgroundWork else { return }
                 self.startTimer()
+                self.startMetricsExportTimer()
                 self.updateProviderRuntimes()
                 await self.refreshHistoricalDatasetIfNeeded()
                 await self.refresh()
+                await self.exportMetricsIfNeeded()
             }
         }
     }
@@ -146,6 +149,7 @@ final class UsageStore {
     @ObservationIgnored var providerRuntimes: [UsageProvider: any ProviderRuntime] = [:]
     @ObservationIgnored private var timerTask: Task<Void, Never>?
     @ObservationIgnored private var tokenTimerTask: Task<Void, Never>?
+    @ObservationIgnored var metricsExportTimerTask: Task<Void, Never>?
     @ObservationIgnored private var tokenRefreshSequenceTask: Task<Void, Never>?
     @ObservationIgnored private var pathDebugRefreshTask: Task<Void, Never>?
     @ObservationIgnored let historicalUsageHistoryStore: HistoricalUsageHistoryStore
@@ -154,10 +158,12 @@ final class UsageStore {
     @ObservationIgnored var lastKnownSessionRemaining: [UsageProvider: Double] = [:]
     @ObservationIgnored var lastKnownSessionWindowSource: [UsageProvider: SessionQuotaWindowSource] = [:]
     @ObservationIgnored var lastTokenFetchAt: [UsageProvider: Date] = [:]
+    @ObservationIgnored var lastMetricsExportAt: Date?
     @ObservationIgnored private var hasCompletedInitialRefresh: Bool = false
     @ObservationIgnored private let tokenFetchTTL: TimeInterval = 60 * 60
     @ObservationIgnored private let tokenFetchTimeout: TimeInterval = 10 * 60
     @ObservationIgnored private let startupBehavior: StartupBehavior
+    @ObservationIgnored let metricsExporter: UsageMetricsCSVExporter
 
     init(
         fetcher: UsageFetcher,
@@ -168,6 +174,7 @@ final class UsageStore {
         registry: ProviderRegistry = .shared,
         historicalUsageHistoryStore: HistoricalUsageHistoryStore = HistoricalUsageHistoryStore(),
         sessionQuotaNotifier: any SessionQuotaNotifying = SessionQuotaNotifier(),
+        metricsExporter: UsageMetricsCSVExporter = UsageMetricsCSVExporter(),
         startupBehavior: StartupBehavior = .automatic)
     {
         self.codexFetcher = fetcher
@@ -178,6 +185,7 @@ final class UsageStore {
         self.registry = registry
         self.historicalUsageHistoryStore = historicalUsageHistoryStore
         self.sessionQuotaNotifier = sessionQuotaNotifier
+        self.metricsExporter = metricsExporter
         self.startupBehavior = startupBehavior.resolved(isRunningTests: Self.isRunningTestsProcess())
         self.providerMetadata = registry.metadata
         self
@@ -220,6 +228,7 @@ final class UsageStore {
         }
         Task { await self.refresh() }
         self.startTimer()
+        self.startMetricsExportTimer()
         self.startTokenTimer()
     }
 
@@ -420,6 +429,7 @@ final class UsageStore {
                 await self.refreshCreditsIfNeeded()
             }
 
+            await self.exportMetricsIfNeeded()
             self.persistWidgetSnapshot(reason: "refresh")
         }
     }
@@ -493,6 +503,7 @@ final class UsageStore {
     deinit {
         self.timerTask?.cancel()
         self.tokenTimerTask?.cancel()
+        self.metricsExportTimerTask?.cancel()
         self.tokenRefreshSequenceTask?.cancel()
     }
 

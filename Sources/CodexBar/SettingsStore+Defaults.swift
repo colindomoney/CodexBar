@@ -13,6 +13,14 @@ extension SettingsStore {
         }
     }
 
+    var metricsExportInterval: MetricsExportInterval {
+        get { self.defaultsState.metricsExportInterval }
+        set {
+            self.defaultsState.metricsExportInterval = newValue
+            self.userDefaults.set(newValue.rawValue, forKey: "metricsExportInterval")
+        }
+    }
+
     var launchAtLogin: Bool {
         get { self.defaultsState.launchAtLogin }
         set {

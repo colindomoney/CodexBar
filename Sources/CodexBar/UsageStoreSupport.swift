@@ -72,6 +72,14 @@ extension UsageStore {
         self.errors[provider] = error
     }
 
+    func _setStatusForTesting(_ status: ProviderStatus?, provider: UsageProvider) {
+        self.statuses[provider] = status
+    }
+
+    func _setSourceLabelForTesting(_ label: String?, provider: UsageProvider) {
+        self.lastSourceLabels[provider] = label
+    }
+
     func _setCodexHistoricalDatasetForTesting(_ dataset: CodexHistoricalDataset?, accountKey: String? = nil) {
         self.codexHistoricalDataset = dataset
         self.codexHistoricalDatasetAccountKey = accountKey

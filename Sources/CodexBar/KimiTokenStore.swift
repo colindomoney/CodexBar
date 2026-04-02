@@ -41,13 +41,9 @@ struct KeychainKimiTokenStore: KimiTokenStoring {
             kSecReturnData as String: true,
         ]
 
-        if case .interactionRequired = KeychainAccessPreflight
-            .checkGenericPassword(service: self.service, account: self.account)
-        {
-            KeychainPromptHandler.handler?(KeychainPromptContext(
-                kind: .kimiToken,
-                service: self.service,
-                account: self.account))
+        guard AppKeychainAccess.prepareForRead(kind: .kimiToken, service: self.service, account: self.account) else {
+            Self.log.debug("Suppressing keychain token prompt for \(self.account)")
+            return nil
         }
 
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -55,6 +51,7 @@ struct KeychainKimiTokenStore: KimiTokenStoring {
             return nil
         }
         guard status == errSecSuccess else {
+            AppKeychainAccess.recordDeniedIfNeeded(status: status, service: self.service, account: self.account)
             Self.log.error("Keychain read failed: \(status)")
             throw KimiTokenStoreError.keychainStatus(status)
         }

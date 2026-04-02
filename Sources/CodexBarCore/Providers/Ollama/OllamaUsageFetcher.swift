@@ -57,7 +57,7 @@ private let ollamaCookieImportOrder: BrowserCookieImportOrder =
 
 public enum OllamaCookieImporter {
     private static let cookieClient = BrowserCookieClient()
-    private static let cookieDomains = ["ollama.com", "www.ollama.com"]
+    private static let cookieDomains = ["ollama.com", "www.ollama.com", "app.ollama.com"]
     static let defaultPreferredBrowsers: [Browser] = [.chrome]
 
     public struct SessionInfo: Sendable {
@@ -368,7 +368,10 @@ public struct OllamaUsageFetcher: Sendable {
             return [CookieCandidate(cookieHeader: manualHeader, sourceLabel: "manual cookie header")]
         }
         #if os(macOS)
-        let sessions = try OllamaCookieImporter.importSessions(browserDetection: self.browserDetection, logger: logger)
+        let sessions = try OllamaCookieImporter.importSessions(
+            browserDetection: self.browserDetection,
+            allowFallbackBrowsers: true,
+            logger: logger)
         return sessions.map { session in
             CookieCandidate(cookieHeader: session.cookieHeader, sourceLabel: session.sourceLabel)
         }
@@ -450,7 +453,10 @@ public struct OllamaUsageFetcher: Sendable {
             return manualHeader
         }
         #if os(macOS)
-        let session = try OllamaCookieImporter.importSession(browserDetection: self.browserDetection, logger: logger)
+        let session = try OllamaCookieImporter.importSession(
+            browserDetection: self.browserDetection,
+            allowFallbackBrowsers: true,
+            logger: logger)
         logger?("[ollama] Using cookies from \(session.sourceLabel)")
         return session.cookieHeader
         #else

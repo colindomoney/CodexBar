@@ -38,6 +38,19 @@ enum RefreshFrequency: String, CaseIterable, Identifiable {
     }
 }
 
+enum MetricsExportPath {
+    static var defaultURL: URL {
+        UsageMetricsCSVExporter.defaultURL
+    }
+
+    static var displayPath: String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let path = self.defaultURL.path
+        guard path.hasPrefix(home) else { return path }
+        return "~" + String(path.dropFirst(home.count))
+    }
+}
+
 enum MenuBarMetricPreference: String, CaseIterable, Identifiable {
     case automatic
     case primary
@@ -159,6 +172,9 @@ extension SettingsStore {
     private static func loadDefaultsState(userDefaults: UserDefaults) -> SettingsDefaultsState {
         let refreshRaw = userDefaults.string(forKey: "refreshFrequency") ?? RefreshFrequency.fiveMinutes.rawValue
         let refreshFrequency = RefreshFrequency(rawValue: refreshRaw) ?? .fiveMinutes
+        let metricsExportRaw = userDefaults.string(forKey: "metricsExportInterval")
+            ?? MetricsExportInterval.off.rawValue
+        let metricsExportInterval = MetricsExportInterval(rawValue: metricsExportRaw) ?? .off
         let launchAtLogin = userDefaults.object(forKey: "launchAtLogin") as? Bool ?? false
         let debugMenuEnabled = userDefaults.object(forKey: "debugMenuEnabled") as? Bool ?? false
         let debugDisableKeychainAccess: Bool = {
@@ -226,6 +242,7 @@ extension SettingsStore {
 
         return SettingsDefaultsState(
             refreshFrequency: refreshFrequency,
+            metricsExportInterval: metricsExportInterval,
             launchAtLogin: launchAtLogin,
             debugMenuEnabled: debugMenuEnabled,
             debugDisableKeychainAccess: debugDisableKeychainAccess,

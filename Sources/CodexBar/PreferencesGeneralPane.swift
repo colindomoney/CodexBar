@@ -85,6 +85,30 @@ struct GeneralPane: View {
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
+
+                        HStack(alignment: .top, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Metrics CSV export")
+                                    .font(.body)
+                                Text("Append reusable usage snapshots to a CSV file for analysis.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Spacer()
+                            Picker("Metrics CSV export", selection: self.$settings.metricsExportInterval) {
+                                ForEach(MetricsExportInterval.allCases) { option in
+                                    Text(option.label).tag(option)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: 200)
+                        }
+                        if self.settings.metricsExportInterval != .off {
+                            Text("Writes to \(MetricsExportPath.displayPath)")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     PreferenceToggleRow(
                         title: "Check provider status",

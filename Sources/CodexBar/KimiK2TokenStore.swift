@@ -28,6 +28,10 @@ struct KeychainKimiK2TokenStore: KimiK2TokenStoring {
     private let account = "kimi-k2-api-token"
 
     func loadToken() throws -> String? {
+        guard !KeychainAccessGate.isDisabled else {
+            Self.log.debug("Keychain access disabled; skipping token load")
+            return nil
+        }
         var result: CFTypeRef?
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -37,13 +41,9 @@ struct KeychainKimiK2TokenStore: KimiK2TokenStoring {
             kSecReturnData as String: true,
         ]
 
-        if case .interactionRequired = KeychainAccessPreflight
-            .checkGenericPassword(service: self.service, account: self.account)
-        {
-            KeychainPromptHandler.handler?(KeychainPromptContext(
-                kind: .kimiK2Token,
-                service: self.service,
-                account: self.account))
+        guard AppKeychainAccess.prepareForRead(kind: .kimiK2Token, service: self.service, account: self.account) else {
+            Self.log.debug("Suppressing keychain token prompt for \(self.account)")
+            return nil
         }
 
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -51,6 +51,7 @@ struct KeychainKimiK2TokenStore: KimiK2TokenStoring {
             return nil
         }
         guard status == errSecSuccess else {
+            AppKeychainAccess.recordDeniedIfNeeded(status: status, service: self.service, account: self.account)
             Self.log.error("Keychain read failed: \(status)")
             throw KimiK2TokenStoreError.keychainStatus(status)
         }
@@ -66,6 +67,10 @@ struct KeychainKimiK2TokenStore: KimiK2TokenStoring {
     }
 
     func storeToken(_ token: String?) throws {
+        guard !KeychainAccessGate.isDisabled else {
+            Self.log.debug("Keychain access disabled; skipping token store")
+            return
+        }
         let cleaned = token?.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleaned == nil || cleaned?.isEmpty == true {
             try self.deleteTokenIfPresent()
@@ -104,6 +109,7 @@ struct KeychainKimiK2TokenStore: KimiK2TokenStoring {
     }
 
     private func deleteTokenIfPresent() throws {
+        guard !KeychainAccessGate.isDisabled else { return }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: self.service,

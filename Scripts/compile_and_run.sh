@@ -16,6 +16,7 @@ RUN_TESTS=0
 DEBUG_LLDB=0
 RELEASE_ARCHES=""
 SIGNING_MODE="${CODEXBAR_SIGNING:-}"
+CLEAR_KEYCHAIN_ON_ADHOC="${CODEXBAR_CLEAR_KEYCHAIN_ON_ADHOC:-0}"
 
 log()  { printf '%s\n' "$*"; }
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -177,15 +178,18 @@ log "==> Killing existing CodexBar instances"
 kill_all_codexbar
 kill_claude_probes
 
-# 2.5) Delete keychain entries to avoid permission prompts with adhoc signing
-# (adhoc signature changes on every build, making old keychain entries inaccessible)
-if [[ "${SIGNING_MODE:-adhoc}" == "adhoc" ]]; then
-  log "==> Clearing keychain entries (adhoc signing)"
+# 2.5) Only clear keychain entries on explicit request.
+# Adhoc signatures change across builds, so "Always Allow" does not persist reliably.
+# But deleting the app's keychain items on every rebuild guarantees fresh prompts, which
+# is worse for normal development. Keep the destructive cleanup opt-in.
+if [[ "${SIGNING_MODE:-adhoc}" == "adhoc" && "${CLEAR_KEYCHAIN_ON_ADHOC}" == "1" ]]; then
+  log "==> Clearing keychain entries (adhoc signing, opt-in)"
   security delete-generic-password -s "com.steipete.CodexBar" 2>/dev/null || true
-  # Clear all keychain items for the app to avoid multiple prompts
   while security delete-generic-password -s "com.steipete.CodexBar" 2>/dev/null; do
     :
   done
+elif [[ "${SIGNING_MODE:-adhoc}" == "adhoc" ]]; then
+  log "==> Preserving keychain entries (adhoc signing; Always Allow will not persist across rebuilds)"
 fi
 
 # 3) Package (release build happens inside package_app.sh).

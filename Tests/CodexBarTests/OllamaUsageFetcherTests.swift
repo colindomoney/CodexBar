@@ -81,6 +81,39 @@ struct OllamaUsageFetcherTests {
     }
 
     @Test
+    func `cookie selector falls back to non chrome candidate by default import path`() throws {
+        let preferred = [
+            OllamaCookieImporter.SessionInfo(
+                cookies: [Self.makeCookie(name: "analytics_session_id", value: "noise")],
+                sourceLabel: "Chrome Profile"),
+        ]
+        let fallback = [
+            OllamaCookieImporter.SessionInfo(
+                cookies: [Self.makeCookie(name: "next-auth.session-token.0", value: "chunk0")],
+                sourceLabel: "Safari Profile"),
+        ]
+
+        let selected = try OllamaCookieImporter.selectSessionInfoWithFallback(
+            preferredCandidates: preferred,
+            allowFallbackBrowsers: true,
+            loadFallbackCandidates: { fallback })
+        #expect(selected.sourceLabel == "Safari Profile")
+    }
+
+    @Test
+    func `cookie selector accepts app subdomain cookie`() throws {
+        let candidate = OllamaCookieImporter.SessionInfo(
+            cookies: [Self.makeCookie(
+                name: "__Secure-next-auth.session-token",
+                value: "auth",
+                domain: "app.ollama.com")],
+            sourceLabel: "App Profile")
+
+        let selected = try OllamaCookieImporter.selectSessionInfo(from: [candidate])
+        #expect(selected.sourceLabel == "App Profile")
+    }
+
+    @Test
     func `cookie selector skips session like noise and finds recognized cookie`() throws {
         let first = OllamaCookieImporter.SessionInfo(
             cookies: [Self.makeCookie(name: "analytics_session_id", value: "noise")],
